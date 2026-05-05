@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+  <h1>🏭 Producción Diaria</h1>
+  <p>Registra qué recetas se van a producir hoy y cuántas unidades</p>
+</div>
+
+<div class="grid-2">
+
+  <!-- Formulario -->
+  <div class="card">
+    <div class="card-title">➕ Registrar Producción</div>
+    <form method="POST" action="/produccion">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" name="fecha" id="fecha" required/>
+      </div>
+
+      <div id="recetas-container">
+        <div class="ing-row">
+          <div>
+            <label>Receta</label>
+            <select name="receta_id[]" required>
+              <option value="">— Seleccionar —</option>
+              {% for r in recetas %}
+                <option value="{{ r.id }}">{{ r.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Unidades</label>
+            <input type="number" name="unidades[]" min="1" placeholder="20" required/>
+          </div>
+          <button type="button" class="remove-btn" onclick="removeRow(this)">✕</button>
+        </div>
+      </div>
+
+      <button type="button" onclick="addRow()" class="btn btn-outline btn-sm" style="margin-bottom:1rem;">➕ Agregar receta</button>
+      <br/>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Registrar Producción</button>
+    </form>
+  </div>
+
+  <!-- Historial -->
+  <div class="card">
+    <div class="card-title">📋 Historial de Producción</div>
+    {% if producciones %}
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Receta</th><th>Unidades</th></tr>
+        </thead>
+        <tbody>
+          {% for p in producciones %}
+          <tr>
+            <td>{{ p.fecha }}</td>
+            <td>{{ p.receta.nombre }}</td>
+            <td><span class="badge badge-orange">{{ p.unidades }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state"><span>📭</span>Sin producciones registradas</div>
+    {% endif %}
+    {% if producciones %}
+    <hr class="divider"/>
+    <a href="/orden" class="btn btn-success" style="width:100%;justify-content:center;">🛒 Generar Orden de Compra</a>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Set today's date as default
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fecha').value = today;
+
+  const recetasOptions = `
+    {% for r in recetas %}
+    <option value="{{ r.id }}">{{ r.nombre }}</option>
+    {% endfor %}
+  `;
+
+  function addRow() {
+    const container = document.getElementById('recetas-container');
+    const div = document.createElement('div');
+    div.className = 'ing-row';
+    div.innerHTML = `
+      <div>
+        <label>Receta</label>
+        <select name="receta_id[]" required>
+          <option value="">— Seleccionar —</option>
+          ${recetasOptions}
+        </select>
+      </div>
+      <div>
+        <label>Unidades</label>
+        <input type="number" name="unidades[]" min="1" placeholder="20" required/>
+      </div>
+      <button type="button" class="remove-btn" onclick="removeRow(this)">✕</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeRow(btn) {
+    const rows = document.querySelectorAll('.ing-row');
+    if (rows.length > 1) btn.closest('.ing-row').remove();
+  }
+</script>
+{% endblock %}

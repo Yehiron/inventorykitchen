@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+  <h1>📊 Dashboard</h1>
+  <p>Resumen general del inventario de cocina</p>
+</div>
+
+<!-- Stats row -->
+<div class="grid-3" style="margin-bottom:2rem;">
+  <div class="stat-card">
+    <div class="stat-icon">🧅</div>
+    <div>
+      <div class="stat-label">Ingredientes</div>
+      <div class="stat-value">{{ stats.ingredientes }}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🍽️</div>
+    <div>
+      <div class="stat-label">Recetas</div>
+      <div class="stat-value">{{ stats.recetas }}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🏭</div>
+    <div>
+      <div class="stat-label">Proveedores</div>
+      <div class="stat-value">{{ stats.proveedores }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Stock de ingredientes -->
+  <div class="card">
+    <div class="card-title">🧅 Stock de Ingredientes</div>
+    {% if ingredientes %}
+      <table>
+        <thead>
+          <tr>
+            <th>Ingrediente</th>
+            <th>Stock</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ing in ingredientes %}
+          <tr>
+            <td>{{ ing.nombre }}</td>
+            <td>{{ ing.stock_actual }} {{ ing.unidad }}</td>
+            <td>
+              {% if ing.stock_actual <= 5 %}
+                <span class="badge badge-red">Crítico</span>
+              {% elif ing.stock_actual <= 20 %}
+                <span class="badge badge-yellow">Bajo</span>
+              {% else %}
+                <span class="badge badge-green">OK</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state"><span>📭</span>Sin ingredientes aún</div>
+    {% endif %}
+  </div>
+
+  <!-- Últimas producciones -->
+  <div class="card">
+    <div class="card-title">📋 Últimas Producciones</div>
+    {% if producciones %}
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Receta</th><th>Und.</th></tr>
+        </thead>
+        <tbody>
+          {% for p in producciones %}
+          <tr>
+            <td>{{ p.fecha }}</td>
+            <td>{{ p.receta.nombre }}</td>
+            <td><span class="badge badge-orange">{{ p.unidades }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state"><span>📭</span>Sin producciones aún</div>
+    {% endif %}
+    <hr class="divider"/>
+    <a href="/produccion" class="btn btn-primary" style="width:100%;justify-content:center;">➕ Nueva Producción</a>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+  <h1>🧅 Ingredientes</h1>
+  <p>Gestión de ingredientes e inventario actual</p>
+</div>
+
+<div class="grid-2">
+
+  <!-- Formulario -->
+  <div class="card">
+    <div class="card-title">➕ Nuevo / Editar Ingrediente</div>
+    <form method="POST" action="/ingredientes">
+      <div class="form-group">
+        <label>Nombre del ingrediente</label>
+        <input type="text" name="nombre" placeholder="Ej: Carne molida 150g" required/>
+      </div>
+      <div class="form-group">
+        <label>Stock actual</label>
+        <input type="number" name="stock_actual" step="0.1" min="0" placeholder="0" required/>
+      </div>
+      <div class="form-group">
+        <label>Unidad de medida</label>
+        <select name="unidad">
+          <option value="unidad">Unidad</option>
+          <option value="kg">Kilogramo (kg)</option>
+          <option value="g">Gramo (g)</option>
+          <option value="l">Litro (l)</option>
+          <option value="ml">Mililitro (ml)</option>
+          <option value="piezas">Piezas</option>
+          <option value="porciones">Porciones</option>
+          <option value="rebanadas">Rebanadas</option>
+          <option value="hojas">Hojas</option>
+          <option value="tiras">Tiras</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Proveedor</label>
+        <select name="proveedor_id">
+          <option value="">— Sin proveedor —</option>
+          {% for p in proveedores %}
+            <option value="{{ p.id }}">{{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Guardar Ingrediente</button>
+    </form>
+  </div>
+
+  <!-- Lista -->
+  <div class="card">
+    <div class="card-title">📋 Ingredientes registrados ({{ ingredientes|length }})</div>
+    {% if ingredientes %}
+      <table>
+        <thead>
+          <tr><th>Nombre</th><th>Stock</th><th>Proveedor</th></tr>
+        </thead>
+        <tbody>
+          {% for ing in ingredientes %}
+          <tr>
+            <td>{{ ing.nombre }}</td>
+            <td>
+              {{ ing.stock_actual }} {{ ing.unidad }}
+              <div class="progress-bar">
+                {% set pct = [[(ing.stock_actual / 100 * 100)|int, 0]|max, 100]|min %}
+                <div class="progress-fill" style="width:{{ pct }}%;background:{% if pct <= 10 %}var(--red){% elif pct <= 30 %}var(--yellow){% else %}var(--green){% endif %};"></div>
+              </div>
+            </td>
+            <td>
+              {% if ing.proveedor %}
+                <span class="badge badge-orange">{{ ing.proveedor }}</span>
+              {% else %}
+                <span class="badge badge-yellow">N/A</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state"><span>📭</span>Sin ingredientes aún</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

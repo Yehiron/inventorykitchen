@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="page-header">
+  <h1>🛒 Orden de Compra</h1>
+  <p>Generada automáticamente según la producción registrada</p>
+</div>
+
+<!-- Formulario de filtro por fecha -->
+<div class="card" style="margin-bottom:1.5rem;">
+  <div class="card-title">🗓️ Seleccionar fecha de producción</div>
+  <form method="GET" action="/orden" style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+    <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+      <label>Fecha</label>
+      <input type="date" name="fecha" value="{{ fecha_sel or '' }}"/>
+    </div>
+    <button type="submit" class="btn btn-primary">Calcular Orden</button>
+    <a href="/orden" class="btn btn-outline">Ver Todo</a>
+  </form>
+</div>
+
+{% if resultado %}
+
+  <!-- Resumen de Producción -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">🏭 Resumen de Producción</div>
+    {% if resultado.produccion %}
+    <table>
+      <thead>
+        <tr><th>Receta</th><th>Unidades a producir</th></tr>
+      </thead>
+      <tbody>
+        {% for item in resultado.produccion %}
+        <tr>
+          <td>{{ item.receta }}</td>
+          <td><span class="badge badge-orange">{{ item.unidades }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty-state"><span>📭</span>Sin producción para esta fecha</div>
+    {% endif %}
+  </div>
+
+  <!-- Faltantes -->
+  {% if resultado.faltantes %}
+  <div class="card" style="margin-bottom:1.5rem;border-color:rgba(239,68,68,.35);">
+    <div class="card-title" style="color:var(--red);">⚠️ Ingredientes Faltantes</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ingrediente</th>
+          <th>Stock Actual</th>
+          <th>Necesario</th>
+          <th>Faltante</th>
+          <th>Proveedor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in resultado.faltantes %}
+        <tr>
+          <td><strong>{{ f.ingrediente }}</strong></td>
+          <td>{{ f.stock_actual }} {{ f.unidad }}</td>
+          <td>{{ f.necesario }} {{ f.unidad }}</td>
+          <td><span class="badge badge-red">{{ f.faltante }} {{ f.unidad }}</span></td>
+          <td>{{ f.proveedor }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-success" style="margin-bottom:1.5rem;">✅ Stock suficiente — No se requiere orden de compra</div>
+  {% endif %}
+
+  <!-- Orden por proveedor -->
+  {% if resultado.orden_por_proveedor %}
+  <div style="margin-bottom:1.5rem;">
+    <div style="font-size:1.25rem;font-weight:700;margin-bottom:1rem;">📦 Orden de Compra por Proveedor</div>
+    <div class="grid-2">
+      {% for proveedor, items in resultado.orden_por_proveedor.items() %}
+      <div class="card" style="border-color:rgba(249,115,22,.35);">
+        <div class="card-title">🏭 {{ proveedor }}</div>
+        <table>
+          <thead>
+            <tr><th>Ingrediente</th><th>Cantidad a Pedir</th></tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item.ingrediente }}</td>
+              <td><span class="badge badge-orange">{{ item.cantidad_a_pedir }} {{ item.unidad }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Botón imprimir -->
+  <div style="text-align:center;margin-top:1rem;">
+    <button onclick="window.print()" class="btn btn-primary">🖨️ Imprimir Orden</button>
+    <a href="/api/generar_orden{% if fecha_sel %}?fecha={{ fecha_sel }}{% endif %}" class="btn btn-outline" target="_blank">📄 Ver JSON</a>
+  </div>
+  {% endif %}
+
+{% else %}
+  <div class="empty-state"><span>🛒</span>Selecciona una fecha o haz clic en "Ver Todo" para generar la orden</div>
+{% endif %}
+
+{% endblock %}
