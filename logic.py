@@ -8,7 +8,7 @@ def calcular_orden(producciones_ids: list[int]) -> dict:
     calcula faltantes y genera la orden agrupada por proveedor.
     """
     resumen_produccion = []
-    necesidades: dict[int, float] = defaultdict(float)  # ingrediente_id -> total necesario
+    necesidades: dict[int, float] = defaultdict(float)  # ingrediente_id  total necesario
 
     for prod in producciones_ids:
         if isinstance(prod, Produccion):

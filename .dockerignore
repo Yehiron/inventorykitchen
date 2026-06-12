@@ -1,0 +1,35 @@
+# .dockerignore
+# ─────────────────────────────────────────────────────────────
+# Este archivo le dice a Docker qué NO copiar al contenedor.
+# Es como el .gitignore pero para Docker.
+# Razón: ahorrar espacio y no subir archivos innecesarios o privados.
+# ─────────────────────────────────────────────────────────────
+
+# El entorno virtual de Python (las librerías instaladas localmente).
+# Docker las reinstala desde requirements.txt, no las necesitamos.
+venv/
+.venv/
+
+# Caché de Python (archivos compilados temporales).
+__pycache__/
+*.pyc
+*.pyo
+
+# La base de datos local. En producción se crea una nueva automáticamente.
+# (¡Importante! Ver nota en la guía sobre persistencia de datos)
+inventory.db
+
+# Archivos de control de versiones. No son parte de la app.
+.git/
+.gitignore
+
+# Archivos de documentación. No son necesarios en el servidor.
+DOCUMENTACION.md
+DEPLOY_GUIDE.md
+
+# Archivos del sistema operativo Mac.
+.DS_Store
+
+# Archivos del editor de código.
+.vscode/
+*.swp

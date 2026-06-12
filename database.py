@@ -14,13 +14,13 @@ def _seed_data():
     if Proveedor.query.first():
         return  # ya tiene datos
 
-    # --- Proveedores ---
+    # Proveedores 
     p1 = Proveedor(nombre="Distribuidora FrescoMar", contacto="frescoMar@gmail.com")
     p2 = Proveedor(nombre="Carnicos Premium S.A.", contacto="carnicos@premium.com")
     db.session.add_all([p1, p2])
     db.session.flush()  # para obtener IDs
 
-    # --- Ingredientes ---
+    #  Ingredientes 
     i1 = Ingrediente(nombre="Pan de hamburguesa", stock_actual=50, unidad="piezas", proveedor_id=p1.id)
     i2 = Ingrediente(nombre="Carne molida 150g", stock_actual=30, unidad="porciones", proveedor_id=p2.id)
     i3 = Ingrediente(nombre="Queso cheddar", stock_actual=20, unidad="rebanadas", proveedor_id=p1.id)
@@ -29,13 +29,13 @@ def _seed_data():
     db.session.add_all([i1, i2, i3, i4, i5])
     db.session.flush()
 
-    # --- Recetas ---
+    # Recetas 
     r1 = Receta(nombre="Hamburguesa Clásica", descripcion="Pan, carne y lechuga")
     r2 = Receta(nombre="Hamburguesa BBQ", descripcion="Pan, carne, queso y tocino")
     db.session.add_all([r1, r2])
     db.session.flush()
 
-    # --- Receta Ingredientes ---
+    # Receta Ingredientes
     db.session.add_all([
         RecetaIngrediente(receta_id=r1.id, ingrediente_id=i1.id, cantidad=1),
         RecetaIngrediente(receta_id=r1.id, ingrediente_id=i2.id, cantidad=1),
@@ -47,4 +47,4 @@ def _seed_data():
     ])
 
     db.session.commit()
-    print("✅  Datos de prueba insertados correctamente.")
+    print("Datos de prueba insertados correctamente.")

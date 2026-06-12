@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    container_name: flask-app
+    restart: unless-stopped
+    ports:
+      - "5001:8080"
+    volumes:
+      - ./data/inventory.db:/app/inventory.db

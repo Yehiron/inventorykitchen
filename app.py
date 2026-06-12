@@ -5,26 +5,27 @@ Ejecutar: python app.py
 
 import os
 from datetime import date
+# pyrefly: ignore [missing-import]
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from models import db, Proveedor, Ingrediente, Receta, RecetaIngrediente, Produccion
 from database import init_db
 from logic import calcular_orden
 
-# ──────────────────────────────────────────────
 # Configuración
-# ──────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "kitchen-inventory-secret-2025"
+# SECRET_KEY: se lee de variable de entorno en producción;
+# si no existe, usa el valor por defecto (solo para desarrollo local).
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "kitchen-inventory-secret-2025")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, 'inventory.db')}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
-# ══════════════════════════════════════════════
-# ██  RUTAS HTML  ██
-# ══════════════════════════════════════════════
+# Inicializar BD al importar el módulo.
+# Necesario para que funcione con Gunicorn (que no ejecuta el bloque __main__).
+init_db(app)
 
 # ─── Dashboard ───────────────────────────────
 @app.route("/")
@@ -284,20 +285,19 @@ def api_generar_orden():
     return jsonify(resultado)
 
 
-# ══════════════════════════════════════════════
-# ██  ENTRY POINT  ██
-# ══════════════════════════════════════════════
+# ENTRY POINT (solo para ejecución local con `python app.py`)
+# En producción Gunicorn importa el módulo directamente y
+# no ejecuta este bloque. La BD ya se inicializó arriba.
 
 if __name__ == "__main__":
-    init_db(app)
     import socket
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
     print("\n" + "═" * 50)
     print("🍔  Kitchen Inventory — SERVIDOR CORRIENDO")
     print("═" * 50)
-    print(f"  → Desde ESTE computador: http://127.0.0.1:5000")
-    print(f"  → Desde la red local:    http://{local_ip}:5000")
+    print(f"  → Desde ESTE computador: http://127.0.0.1:8080")
+    print(f"  → Desde la red local:    http://{local_ip}:8080")
     print("  Comparte la dirección de red local con tus empleados")
     print("═" * 50 + "\n")
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="0.0.0.0", port=8080)
