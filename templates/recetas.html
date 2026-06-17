@@ -6,9 +6,14 @@
   <p>Gestión de recetas y sus ingredientes</p>
 </div>
 
+<!-- Buscador de recetas -->
+<div style="margin-bottom:1.25rem;">
+  <input type="text" id="buscador-recetas" placeholder="🔍 Buscar receta..." style="max-width:360px;" oninput="filtrarRecetas(this.value)"/>
+</div>
+
 <div class="grid-2">
 
-  <!-- Formulario -->
+  <!-- Formulario Nueva Receta -->
   <div class="card">
     <div class="card-title">➕ Nueva Receta</div>
     <form method="POST" action="/recetas" id="form-receta">
@@ -22,13 +27,16 @@
       </div>
 
       <hr class="divider"/>
-      <div class="card-title" style="margin-bottom:.75rem;">🧅 Ingredientes</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div class="card-title" style="margin-bottom:0;">🧅 Ingredientes</div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="abrirModalIngrediente()">➕ Crear ingrediente</button>
+      </div>
 
       <div id="ingredientes-container">
         <div class="ing-row">
           <div>
             <label>Ingrediente</label>
-            <select name="ingrediente_id[]" required>
+            <select name="ingrediente_id[]" class="ing-select" required>
               <option value="">— Seleccionar —</option>
               {% for ing in ingredientes %}
                 <option value="{{ ing.id }}">{{ ing.nombre }}</option>
@@ -50,13 +58,20 @@
     </form>
   </div>
 
-  <!-- Lista -->
-  <div class="card">
-    <div class="card-title">📋 Recetas registradas ({{ recetas|length }})</div>
+  <!-- Lista de Recetas -->
+  <div class="card" style="overflow-y:auto;max-height:80vh;">
+    <div class="card-title">📋 Recetas registradas (<span id="contador-recetas">{{ recetas|length }}</span>)</div>
     {% if recetas %}
+      <div id="lista-recetas">
       {% for r in recetas %}
-      <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
-        <div style="font-weight:600;margin-bottom:.5rem;">🍔 {{ r.nombre }}</div>
+      <div class="receta-item" data-nombre="{{ r.nombre|lower }}" style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+          <div style="font-weight:600;">🍔 {{ r.nombre }}</div>
+          <div style="display:flex;gap:.4rem;">
+            <button class="btn btn-outline btn-sm" onclick="abrirEditar({{ r.id }}, '{{ r.nombre }}', '{{ r.descripcion or '' }}')">✏️</button>
+            <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmarEliminarReceta('{{ r.nombre }}', '/recetas/{{ r.id }}/eliminar')" title="Eliminar receta">🗑️</button>
+          </div>
+        </div>
         {% if r.descripcion %}
           <div style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem;">{{ r.descripcion }}</div>
         {% endif %}
@@ -75,6 +90,8 @@
         </table>
       </div>
       {% endfor %}
+      </div>
+      <div id="sin-recetas" style="display:none;" class="empty-state"><span>🔍</span>Sin resultados</div>
     {% else %}
       <div class="empty-state"><span>📭</span>Sin recetas aún</div>
     {% endif %}
@@ -82,12 +99,84 @@
 
 </div>
 
+<!-- ═══ MODAL: Crear Ingrediente Rápido ═══ -->
+<div id="modal-ingrediente" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-ingrediente')">
+  <div class="modal-box modal-box-wide" onclick="event.stopPropagation()">
+    <div class="modal-icon">🧅</div>
+    <h3 class="modal-title">Crear Ingrediente Rápido</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">El ingrediente se creará y estará disponible inmediatamente en el selector.</p>
+    <div class="form-group">
+      <label>Nombre del ingrediente *</label>
+      <input type="text" id="qi-nombre" placeholder="Ej: Aguacate" required/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div class="form-group">
+        <label>Stock inicial</label>
+        <input type="number" id="qi-stock" step="0.1" min="0" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label>Unidad</label>
+        <select id="qi-unidad">
+          <option value="unidad">Unidad</option>
+          <option value="kg">Kilogramo (kg)</option>
+          <option value="g">Gramo (g)</option>
+          <option value="l">Litro (l)</option>
+          <option value="ml">Mililitro (ml)</option>
+          <option value="piezas">Piezas</option>
+          <option value="porciones">Porciones</option>
+          <option value="rebanadas">Rebanadas</option>
+          <option value="hojas">Hojas</option>
+          <option value="tiras">Tiras</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Proveedor (opcional)</label>
+      <select id="qi-proveedor">
+        <option value="">— Sin proveedor —</option>
+        {% for p in proveedores %}
+          <option value="{{ p.id }}">{{ p.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div id="qi-error" style="display:none;font-size:.82rem;color:var(--red);margin-bottom:.75rem;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-ingrediente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="crearIngredienteRapido()">✅ Crear y agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Confirmar Eliminar Receta ═══ -->
+<div id="modal-eliminar-receta" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-eliminar-receta')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">🗑️</div>
+    <h3 class="modal-title">¿Eliminar receta?</h3>
+    <p class="modal-desc" id="modal-receta-desc"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-eliminar-receta')">Cancelar</button>
+      <form id="form-eliminar-receta" method="POST">
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
-  const ingredientesOptions = `
+  // Opciones de ingredientes para nuevas filas (se actualiza dinámicamente)
+  let ingredientesData = [
     {% for ing in ingredientes %}
-    <option value="{{ ing.id }}">{{ ing.nombre }}</option>
+    { id: {{ ing.id }}, nombre: "{{ ing.nombre }}" },
     {% endfor %}
-  `;
+  ];
+
+  function getIngredientesOptions(selectedId = '') {
+    let opts = `<option value="">— Seleccionar —</option>`;
+    ingredientesData.forEach(ing => {
+      opts += `<option value="${ing.id}" ${ing.id == selectedId ? 'selected' : ''}>${ing.nombre}</option>`;
+    });
+    return opts;
+  }
 
   function addRow() {
     const container = document.getElementById('ingredientes-container');
@@ -96,9 +185,8 @@
     div.innerHTML = `
       <div>
         <label>Ingrediente</label>
-        <select name="ingrediente_id[]" required>
-          <option value="">— Seleccionar —</option>
-          ${ingredientesOptions}
+        <select name="ingrediente_id[]" class="ing-select" required>
+          ${getIngredientesOptions()}
         </select>
       </div>
       <div>
@@ -114,5 +202,184 @@
     const rows = document.querySelectorAll('.ing-row');
     if (rows.length > 1) btn.closest('.ing-row').remove();
   }
+
+  // ── Modal ingrediente rápido ──
+  function abrirModalIngrediente() {
+    document.getElementById('qi-nombre').value = '';
+    document.getElementById('qi-stock').value = '0';
+    document.getElementById('qi-unidad').value = 'unidad';
+    document.getElementById('qi-proveedor').value = '';
+    document.getElementById('qi-error').style.display = 'none';
+    document.getElementById('modal-ingrediente').style.display = 'flex';
+    setTimeout(() => document.getElementById('qi-nombre').focus(), 100);
+  }
+
+  async function crearIngredienteRapido() {
+    const nombre = document.getElementById('qi-nombre').value.trim();
+    const stock  = parseFloat(document.getElementById('qi-stock').value) || 0;
+    const unidad = document.getElementById('qi-unidad').value;
+    const provId = document.getElementById('qi-proveedor').value || null;
+    const errEl  = document.getElementById('qi-error');
+
+    if (!nombre) {
+      errEl.textContent = 'El nombre es obligatorio.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/ingredientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, stock_actual: stock, unidad, proveedor_id: provId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Error al crear el ingrediente.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // Agregar a la lista local
+      ingredientesData.push({ id: data.id, nombre: data.nombre });
+      ingredientesData.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+      // Actualizar todos los selects existentes
+      document.querySelectorAll('.ing-select').forEach(sel => {
+        const currentVal = sel.value;
+        sel.innerHTML = getIngredientesOptions(currentVal);
+      });
+
+      cerrarModal('modal-ingrediente');
+
+      // Seleccionar el nuevo ingrediente en el último select
+      const selects = document.querySelectorAll('.ing-select');
+      if (selects.length > 0) {
+        selects[selects.length - 1].value = data.id;
+      }
+
+      // Mostrar toast de éxito
+      mostrarToast(`✅ Ingrediente "${nombre}" creado y disponible en el selector.`);
+    } catch (err) {
+      errEl.textContent = 'Error de red. Intenta de nuevo.';
+      errEl.style.display = 'block';
+    }
+  }
+
+  // ── Modal eliminar receta ──
+  function confirmarEliminarReceta(nombre, url) {
+    document.getElementById('modal-receta-desc').textContent = `"${nombre}" y todos sus ingredientes de receta serán eliminados.`;
+    document.getElementById('form-eliminar-receta').action = url;
+    document.getElementById('modal-eliminar-receta').style.display = 'flex';
+  }
+
+  function cerrarModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['modal-ingrediente','modal-eliminar-receta'].forEach(cerrarModal);
+    }
+  });
+
+  // ── Búsqueda en tiempo real ──
+  function filtrarRecetas(query) {
+    const items = document.querySelectorAll('.receta-item');
+    const term = query.toLowerCase().trim();
+    let visibles = 0;
+    items.forEach(item => {
+      const nombre = item.dataset.nombre || '';
+      const match = nombre.includes(term);
+      item.style.display = match ? '' : 'none';
+      if (match) visibles++;
+    });
+    document.getElementById('contador-recetas').textContent = visibles;
+    const sinRes = document.getElementById('sin-recetas');
+    if (sinRes) sinRes.style.display = visibles === 0 && term ? 'block' : 'none';
+  }
+
+  // ── Toast de confirmación ──
+  function mostrarToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast-msg';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.classList.add('toast-show'), 10);
+    setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 400); }, 3500);
+  }
 </script>
+
+<!-- ═══ MODAL: Editar Receta ═══ -->
+<div id="modal-editar-receta" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-editar-receta')">
+  <div class="modal-box modal-box-wide" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto;">
+    <div class="modal-icon">✏️</div>
+    <h3 class="modal-title">Editar Receta</h3>
+    <form id="form-editar-receta" method="POST">
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Nombre</label>
+        <input type="text" name="nombre" id="er-nombre" required/>
+      </div>
+      <div class="form-group">
+        <label>Descripción</label>
+        <input type="text" name="descripcion" id="er-desc"/>
+      </div>
+      <hr class="divider"/>
+      <div class="card-title" style="margin-bottom:.75rem;">🧅 Ingredientes</div>
+      <div id="er-container"></div>
+      <button type="button" onclick="erAddRow()" class="btn btn-outline btn-sm" style="margin-bottom:1rem;">➕ Agregar ingrediente</button>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-editar-receta')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  async function abrirEditar(id, nombre, desc) {
+    document.getElementById('er-nombre').value = nombre;
+    document.getElementById('er-desc').value = desc;
+    document.getElementById('form-editar-receta').action = `/recetas/${id}/editar`;
+    document.getElementById('er-container').innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Cargando...</p>';
+    document.getElementById('modal-editar-receta').style.display = 'flex';
+    try {
+      const res = await fetch(`/api/recetas/${id}`);
+      const r = await res.json();
+      document.getElementById('er-container').innerHTML = '';
+      r.ingredientes.forEach(ri => erAddRow(ri.ingrediente_id, ri.cantidad));
+      if (!r.ingredientes.length) erAddRow();
+    } catch { document.getElementById('er-container').innerHTML = ''; erAddRow(); }
+  }
+
+  function erAddRow(ingId = '', cant = '') {
+    const container = document.getElementById('er-container');
+    const div = document.createElement('div');
+    div.className = 'ing-row';
+    div.innerHTML = `
+      <div><label>Ingrediente</label>
+        <select name="ingrediente_id[]" class="ing-select" required>
+          ${getIngredientesOptions(ingId)}
+        </select>
+      </div>
+      <div><label>Cantidad</label>
+        <input type="number" name="cantidad[]" step="0.01" min="0.01" value="${cant}" required/>
+      </div>
+      <button type="button" class="remove-btn" onclick="this.closest('.ing-row').remove()">✕</button>`;
+    container.appendChild(div);
+  }
+</script>
+
+<style>
+  .toast-msg {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--surface); border: 1px solid var(--green);
+    color: var(--green); padding: .85rem 1.25rem;
+    border-radius: 10px; font-size: .875rem; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(12px); transition: all .3s ease; z-index: 9999;
+  }
+  .toast-show { opacity: 1; transform: translateY(0); }
+</style>
 {% endblock %}

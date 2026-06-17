@@ -26,6 +26,7 @@ class Ingrediente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     stock_actual = db.Column(db.Float, nullable=False, default=0)
+    stock_minimo = db.Column(db.Float, nullable=False, default=0)
     unidad = db.Column(db.String(20), nullable=False, default="unidad")
     proveedor_id = db.Column(db.Integer, db.ForeignKey("proveedores.id"), nullable=True)
 
@@ -34,6 +35,7 @@ class Ingrediente(db.Model):
             "id": self.id,
             "nombre": self.nombre,
             "stock_actual": self.stock_actual,
+            "stock_minimo": self.stock_minimo,
             "unidad": self.unidad,
             "proveedor_id": self.proveedor_id,
             "proveedor": self.proveedor.nombre if self.proveedor else None,

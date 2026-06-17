@@ -1,9 +1,16 @@
+version: '3.8'
+
 services:
   app:
     build: .
-    container_name: flask-app
+    container_name: kitchen-inventory
     restart: unless-stopped
     ports:
-      - "5001:8080"
+      - "8080:8080"
+    environment:
+      - DB_PATH=/app/data/inventory.db
+      - FLASK_ENV=production
+      - SECRET_KEY=kitchen-inventory-secret-production-2026
     volumes:
-      - ./data/inventory.db:/app/inventory.db
+      # Montamos la CARPETA en lugar del archivo para evitar problemas si SQLite aún no ha creado la DB.
+      - ./data:/app/data

@@ -36,19 +36,56 @@
         </div>
       </div>
 
-      <button type="button" onclick="addRow()" class="btn btn-outline btn-sm" style="margin-bottom:1rem;">➕ Agregar receta</button>
-      <br/>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Registrar Producción</button>
+      <div style="display:flex;gap:.75rem;margin-bottom:1.5rem;">
+        <button type="button" onclick="proyectarOrden()" class="btn btn-outline" style="flex:1;justify-content:center;background:var(--surface2);">📊 Ver faltantes para esto</button>
+        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center;">✅ Registrar Producción</button>
+      </div>
+
+      <!-- Contenedor de Proyección -->
+      <div id="proyeccion-container" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <strong style="color:var(--accent);">⚠️ Ingredientes Faltantes</strong>
+          <button type="button" onclick="imprimirProyeccion()" class="btn btn-sm btn-success">🖨️ Imprimir seleccionados</button>
+        </div>
+        <table style="font-size:.8rem;" id="tabla-proyeccion">
+          <thead>
+            <tr>
+              <th style="width:30px;"><input type="checkbox" checked onchange="toggleAllProyeccion(this)"/></th>
+              <th>Ingrediente</th>
+              <th>Nec.</th>
+              <th>Stock</th>
+              <th>Falta</th>
+            </tr>
+          </thead>
+          <tbody id="proyeccion-body"></tbody>
+        </table>
+        <div id="sin-faltantes" style="display:none;color:var(--green);font-size:.85rem;text-align:center;padding:1rem;">
+          ✅ Tienes stock suficiente para esta producción.
+        </div>
+      </div>
     </form>
   </div>
 
   <!-- Historial -->
   <div class="card">
     <div class="card-title">📋 Historial de Producción</div>
+    <!-- Filtro por fecha -->
+    <form method="GET" action="/produccion" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;">
+      <div style="flex:1;min-width:130px;">
+        <label style="font-size:.75rem;">Desde</label>
+        <input type="date" name="fecha_ini" value="{{ fecha_ini }}"/>
+      </div>
+      <div style="flex:1;min-width:130px;">
+        <label style="font-size:.75rem;">Hasta</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}"/>
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">🔍 Filtrar</button>
+      <a href="/produccion" class="btn btn-outline btn-sm">✕ Limpiar</a>
+    </form>
     {% if producciones %}
       <table>
         <thead>
-          <tr><th>Fecha</th><th>Receta</th><th>Unidades</th></tr>
+          <tr><th>Fecha</th><th>Receta</th><th>Unidades</th><th style="text-align:right;">Acción</th></tr>
         </thead>
         <tbody>
           {% for p in producciones %}
@@ -56,6 +93,9 @@
             <td>{{ p.fecha }}</td>
             <td>{{ p.receta.nombre }}</td>
             <td><span class="badge badge-orange">{{ p.unidades }}</span></td>
+            <td style="text-align:right;">
+              <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmarEliminar('{{ p.receta.nombre }}', '{{ p.fecha }}', '/produccion/{{ p.id }}/eliminar')" title="Eliminar">🗑️</button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -69,6 +109,21 @@
     {% endif %}
   </div>
 
+</div>
+
+<!-- ═══ MODAL: Confirmar Eliminación ═══ -->
+<div id="modal-eliminar" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-eliminar')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">🗑️</div>
+    <h3 class="modal-title">¿Eliminar producción?</h3>
+    <p class="modal-desc" id="modal-eliminar-desc"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-eliminar')">Cancelar</button>
+      <form id="modal-eliminar-form" method="POST">
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -106,6 +161,174 @@
   function removeRow(btn) {
     const rows = document.querySelectorAll('.ing-row');
     if (rows.length > 1) btn.closest('.ing-row').remove();
+  }
+
+  function confirmarEliminar(receta, fecha, url) {
+    document.getElementById('modal-eliminar-desc').textContent = `Producción de "${receta}" del ${fecha} será eliminada.`;
+    document.getElementById('modal-eliminar-form').action = url;
+    document.getElementById('modal-eliminar').style.display = 'flex';
+  }
+
+  function cerrarModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') cerrarModal('modal-eliminar');
+  });
+
+  // ── Proyección de faltantes ──
+  async function proyectarOrden() {
+    const items = [];
+    const rows = document.querySelectorAll('.ing-row');
+    rows.forEach(row => {
+      const recId = row.querySelector('select').value;
+      const unds = row.querySelector('input[type="number"]').value;
+      if (recId && unds) items.push({ receta_id: recId, unidades: unds });
+    });
+
+    if (items.length === 0) {
+      alert("Agrega al menos una receta con unidades.");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/proyectar_orden', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      const data = await res.json();
+      
+      const container = document.getElementById('proyeccion-container');
+      const tbody = document.getElementById('proyeccion-body');
+      const table = document.getElementById('tabla-proyeccion');
+      const sinFaltantes = document.getElementById('sin-faltantes');
+      
+      tbody.innerHTML = '';
+      container.style.display = 'block';
+
+      if (!data.faltantes || data.faltantes.length === 0) {
+        table.style.display = 'none';
+        sinFaltantes.style.display = 'block';
+      } else {
+        table.style.display = 'table';
+        sinFaltantes.style.display = 'none';
+        data.faltantes.forEach((f, idx) => {
+          tbody.innerHTML += `
+            <tr class="proy-row">
+              <td><input type="checkbox" class="proy-check" checked data-prov="${f.proveedor}" data-ing="${f.ingrediente}" onchange="toggleRow(this)"/></td>
+              <td><strong>${f.ingrediente}</strong></td>
+              <td class="proy-nec">${f.necesario}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:.3rem;">
+                  <input type="number" value="${f.stock_actual}" step="0.1" min="0" 
+                         style="width:70px;padding:.2rem;font-size:.8rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);"
+                         onchange="actualizarStock(${f.ingrediente_id}, '${f.unidad}', this)"/>
+                  <span style="color:var(--muted);font-size:.8rem;">${f.unidad}</span>
+                </div>
+              </td>
+              <td><span class="badge badge-red proy-badge">${f.faltante} ${f.unidad}</span></td>
+            </tr>
+          `;
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error al calcular faltantes.");
+    }
+  }
+
+  async function actualizarStock(ingId, unidad, inputEl) {
+    const nuevoStock = parseFloat(inputEl.value);
+    if (isNaN(nuevoStock) || nuevoStock < 0) return;
+    try {
+      const res = await fetch(`/api/ingredientes/${ingId}/stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock_actual: nuevoStock })
+      });
+      if (res.ok) {
+        const row = inputEl.closest('tr');
+        const nec = parseFloat(row.querySelector('.proy-nec').textContent);
+        const diff = nec - nuevoStock;
+        const badge = row.querySelector('.proy-badge');
+        const chk = row.querySelector('.proy-check');
+        
+        if (diff > 0) {
+          badge.textContent = diff.toFixed(2) + ' ' + unidad;
+          badge.className = 'badge badge-red proy-badge';
+          chk.checked = true;
+          toggleRow(chk);
+        } else {
+          badge.textContent = '0 ' + unidad;
+          badge.className = 'badge badge-green proy-badge';
+          chk.checked = false;
+          toggleRow(chk);
+        }
+      }
+    } catch (e) {}
+  }
+
+
+  function toggleAllProyeccion(checkAll) {
+    document.querySelectorAll('.proy-check').forEach(chk => {
+      chk.checked = checkAll.checked;
+      toggleRow(chk);
+    });
+  }
+
+  function toggleRow(chk) {
+    chk.closest('tr').style.opacity = chk.checked ? '1' : '0.4';
+    chk.closest('tr').classList.toggle('no-print-row', !chk.checked);
+  }
+
+  function imprimirProyeccion() {
+    // Generar un html temporal para imprimir solo lo seleccionado
+    const checks = document.querySelectorAll('.proy-check:checked');
+    if (checks.length === 0) {
+      alert("No hay ingredientes seleccionados para imprimir.");
+      return;
+    }
+
+    // Agrupar por proveedor
+    const porProv = {};
+    checks.forEach(chk => {
+      const p = chk.dataset.prov;
+      if (!porProv[p]) porProv[p] = [];
+      porProv[p].push(chk.dataset.ing);
+    });
+
+    let html = `
+      <style>
+        body { font-family: sans-serif; padding: 2rem; }
+        h2 { margin-bottom: 1rem; border-bottom: 2px solid #000; padding-bottom: .5rem; }
+        .prov-box { margin-bottom: 2rem; }
+        .prov-title { font-weight: bold; font-size: 1.1rem; margin-bottom: .5rem; background: #eee; padding: .5rem; }
+        ul { list-style-type: square; padding-left: 1.5rem; }
+        li { padding: .25rem 0; font-size: 1.05rem; }
+      </style>
+      <h2>Lista de Ingredientes a Pedir</h2>
+      <p>Fecha: ${new Date().toLocaleDateString()}</p>
+    `;
+
+    for (const [prov, ings] of Object.entries(porProv)) {
+      html += `
+        <div class="prov-box">
+          <div class="prov-title">🏭 Proveedor: ${prov}</div>
+          <ul>
+            ${ings.map(ing => `<li>${ing}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 250);
   }
 </script>
 {% endblock %}

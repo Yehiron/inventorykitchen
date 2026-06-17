@@ -7,7 +7,7 @@
 </div>
 
 <!-- Stats row -->
-<div class="grid-3" style="margin-bottom:2rem;">
+<div class="grid-4" style="margin-bottom:2rem;">
   <div class="stat-card">
     <div class="stat-icon">🧅</div>
     <div>
@@ -29,7 +29,32 @@
       <div class="stat-value">{{ stats.proveedores }}</div>
     </div>
   </div>
+  <div class="stat-card" style="border-color:{% if producciones_hoy > 0 %}var(--green){% else %}var(--border){% endif %};">
+    <div class="stat-icon">📅</div>
+    <div>
+      <div class="stat-label">Producción hoy</div>
+      <div class="stat-value" style="color:{% if producciones_hoy > 0 %}var(--green){% else %}var(--muted){% endif %};">{{ producciones_hoy }}</div>
+    </div>
+  </div>
 </div>
+
+<!-- Alerta de stock bajo -->
+{% if stock_bajo %}
+<div class="alert-stock" style="margin-bottom:1.5rem;">
+  <div class="alert-stock-header">
+    <span>⚠️</span>
+    <strong>{{ stock_bajo|length }} ingrediente(s) con stock bajo (&lt; 10)</strong>
+    <a href="/ingredientes" style="margin-left:auto;font-size:.8rem;color:var(--accent);text-decoration:none;">Ver ingredientes →</a>
+  </div>
+  <div class="alert-stock-pills">
+    {% for ing in stock_bajo %}
+      <span class="stock-pill {% if ing.stock_actual <= 3 %}pill-red{% else %}pill-yellow{% endif %}">
+        {{ ing.nombre }} — {{ ing.stock_actual }} {{ ing.unidad }}
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div class="grid-2">
 
@@ -51,9 +76,9 @@
             <td>{{ ing.nombre }}</td>
             <td>{{ ing.stock_actual }} {{ ing.unidad }}</td>
             <td>
-              {% if ing.stock_actual <= 5 %}
-                <span class="badge badge-red">Crítico</span>
-              {% elif ing.stock_actual <= 20 %}
+              {% if ing.stock_actual <= 3 %}
+                <span class="badge badge-red">⚠️ Crítico</span>
+              {% elif ing.stock_actual <= 10 %}
                 <span class="badge badge-yellow">Bajo</span>
               {% else %}
                 <span class="badge badge-green">OK</span>
@@ -66,6 +91,8 @@
     {% else %}
       <div class="empty-state"><span>📭</span>Sin ingredientes aún</div>
     {% endif %}
+    <hr class="divider"/>
+    <a href="/ingredientes" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;">Gestionar ingredientes →</a>
   </div>
 
   <!-- Últimas producciones -->
@@ -90,8 +117,73 @@
       <div class="empty-state"><span>📭</span>Sin producciones aún</div>
     {% endif %}
     <hr class="divider"/>
-    <a href="/produccion" class="btn btn-primary" style="width:100%;justify-content:center;">➕ Nueva Producción</a>
+    <div style="display:flex;gap:.75rem;">
+      <a href="/produccion" class="btn btn-primary" style="flex:1;justify-content:center;">➕ Nueva Producción</a>
+      <a href="/orden" class="btn btn-success" style="flex:1;justify-content:center;">🛒 Orden de Compra</a>
+    </div>
   </div>
 
 </div>
+
+<!-- Chart producción últimos 14 días -->
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card-title">📈 Producción — Últimos 14 días</div>
+  <canvas id="chartProd" height="80"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+  const ctx = document.getElementById('chartProd').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ chart_labels|safe }},
+      datasets: [{
+        label: 'Unidades producidas',
+        data: {{ chart_values|safe }},
+        backgroundColor: 'rgba(249,115,22,.35)',
+        borderColor: 'rgba(249,115,22,.9)',
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.05)' } },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+<style>
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+  @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .grid-4 { grid-template-columns: 1fr; } }
+
+  .alert-stock {
+    background: rgba(234,179,8,.07);
+    border: 1px solid rgba(234,179,8,.35);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+  }
+  .alert-stock-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    color: var(--yellow);
+    font-size: .9rem;
+    margin-bottom: .75rem;
+  }
+  .alert-stock-pills { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .stock-pill {
+    padding: .25rem .75rem;
+    border-radius: 99px;
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .pill-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .pill-yellow { background: rgba(234,179,8,.15); color: var(--yellow); }
+</style>
 {% endblock %}

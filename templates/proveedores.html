@@ -28,14 +28,18 @@
     {% if proveedores %}
       <table>
         <thead>
-          <tr><th>#</th><th>Nombre</th><th>Contacto</th></tr>
+          <tr><th>#</th><th>Nombre</th><th>Contacto</th><th style="text-align:right;">Acciones</th></tr>
         </thead>
         <tbody>
           {% for p in proveedores %}
           <tr>
-            <td>{{ p.id }}</td>
-            <td>{{ p.nombre }}</td>
+            <td style="color:var(--muted);font-size:.8rem;">{{ p.id }}</td>
+            <td><strong>{{ p.nombre }}</strong></td>
             <td style="color:var(--muted);">{{ p.contacto or '—' }}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn btn-outline btn-sm" onclick="abrirEditar({{ p.id }}, '{{ p.nombre }}', '{{ p.contacto or '' }}')" title="Editar">✏️</button>
+              <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmarEliminar('{{ p.nombre }}', '/proveedores/{{ p.id }}/eliminar')" title="Eliminar">🗑️</button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -46,4 +50,67 @@
   </div>
 
 </div>
+
+<!-- ═══ MODAL: Confirmar Eliminación ═══ -->
+<div id="modal-eliminar" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-eliminar')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">🗑️</div>
+    <h3 class="modal-title">¿Eliminar proveedor?</h3>
+    <p class="modal-desc" id="modal-eliminar-desc"></p>
+    <p style="font-size:.8rem;color:var(--yellow);margin-top:.5rem;">⚠️ Los ingredientes asociados quedarán sin proveedor.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-eliminar')">Cancelar</button>
+      <form id="modal-eliminar-form" method="POST">
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Editar Proveedor ═══ -->
+<div id="modal-editar" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-editar')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">✏️</div>
+    <h3 class="modal-title">Editar Proveedor</h3>
+    <form id="form-editar" method="POST">
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Nombre del proveedor</label>
+        <input type="text" name="nombre" id="editar-nombre" required/>
+      </div>
+      <div class="form-group">
+        <label>Contacto (email / teléfono)</label>
+        <input type="text" name="contacto" id="editar-contacto" placeholder="Opcional"/>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-editar')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function confirmarEliminar(nombre, url) {
+    document.getElementById('modal-eliminar-desc').textContent = `"${nombre}" será eliminado permanentemente.`;
+    document.getElementById('modal-eliminar-form').action = url;
+    document.getElementById('modal-eliminar').style.display = 'flex';
+  }
+
+  function abrirEditar(id, nombre, contacto) {
+    document.getElementById('editar-nombre').value = nombre;
+    document.getElementById('editar-contacto').value = contacto;
+    document.getElementById('form-editar').action = `/proveedores/${id}/editar`;
+    document.getElementById('modal-editar').style.display = 'flex';
+  }
+
+  function cerrarModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['modal-eliminar','modal-editar'].forEach(cerrarModal);
+    }
+  });
+</script>
 {% endblock %}

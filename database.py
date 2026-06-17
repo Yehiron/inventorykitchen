@@ -6,7 +6,19 @@ def init_db(app):
     """Crea las tablas si no existen e inserta datos de prueba."""
     with app.app_context():
         db.create_all()
+        _migrate(app)
         _seed_data()
+
+
+def _migrate(app):
+    """Migraciones ligeras para columnas nuevas."""
+    from sqlalchemy import text
+    with app.app_context():
+        try:
+            db.session.execute(text("ALTER TABLE ingredientes ADD COLUMN stock_minimo FLOAT NOT NULL DEFAULT 0"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()  # columna ya existe, ignorar
 
 
 def _seed_data():

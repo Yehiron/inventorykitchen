@@ -6,19 +6,28 @@
   <p>Gestión de ingredientes e inventario actual</p>
 </div>
 
+<!-- Buscador -->
+<div style="margin-bottom:1.25rem;">
+  <input type="text" id="buscador" placeholder="🔍 Buscar ingrediente..." style="max-width:360px;" oninput="filtrarIngredientes(this.value)"/>
+</div>
+
 <div class="grid-2">
 
-  <!-- Formulario -->
+  <!-- Formulario Nuevo -->
   <div class="card">
-    <div class="card-title">➕ Nuevo / Editar Ingrediente</div>
+    <div class="card-title">➕ Nuevo Ingrediente</div>
     <form method="POST" action="/ingredientes">
       <div class="form-group">
         <label>Nombre del ingrediente</label>
-        <input type="text" name="nombre" placeholder="Ej: Carne molida 150g" required/>
+        <input type="text" name="nombre" id="nuevo-nombre" placeholder="Ej: Carne molida 150g" required/>
       </div>
       <div class="form-group">
         <label>Stock actual</label>
         <input type="number" name="stock_actual" step="0.1" min="0" placeholder="0" required/>
+      </div>
+      <div class="form-group">
+        <label>Stock mínimo (alerta reorden)</label>
+        <input type="number" name="stock_minimo" step="0.1" min="0" placeholder="0"/>
       </div>
       <div class="form-group">
         <label>Unidad de medida</label>
@@ -50,16 +59,16 @@
 
   <!-- Lista -->
   <div class="card">
-    <div class="card-title">📋 Ingredientes registrados ({{ ingredientes|length }})</div>
+    <div class="card-title">📋 Ingredientes registrados (<span id="contador">{{ ingredientes|length }}</span>)</div>
     {% if ingredientes %}
-      <table>
+      <table id="tabla-ingredientes">
         <thead>
-          <tr><th>Nombre</th><th>Stock</th><th>Proveedor</th></tr>
+          <tr><th>Nombre</th><th>Stock</th><th>Proveedor</th><th style="text-align:right;">Acciones</th></tr>
         </thead>
         <tbody>
           {% for ing in ingredientes %}
-          <tr>
-            <td>{{ ing.nombre }}</td>
+          <tr class="ing-fila" data-nombre="{{ ing.nombre|lower }}">
+            <td><strong>{{ ing.nombre }}</strong></td>
             <td>
               {{ ing.stock_actual }} {{ ing.unidad }}
               <div class="progress-bar">
@@ -74,14 +83,157 @@
                 <span class="badge badge-yellow">N/A</span>
               {% endif %}
             </td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn btn-outline btn-sm" onclick="abrirAjuste({{ ing.id }}, '{{ ing.nombre }}', {{ ing.stock_actual }}, '{{ ing.unidad }}')" title="Ajustar stock">⚡</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirEditar({{ ing.id }}, '{{ ing.nombre }}', {{ ing.stock_actual }}, {{ ing.stock_minimo }}, '{{ ing.unidad }}', '{{ ing.proveedor_id or '' }}')" title="Editar">✏️</button>
+              <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmarEliminar('{{ ing.nombre }}', '/ingredientes/{{ ing.id }}/eliminar')" title="Eliminar">🗑️</button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      <div id="sin-resultados" style="display:none;" class="empty-state"><span>🔍</span>Sin resultados para la búsqueda</div>
     {% else %}
       <div class="empty-state"><span>📭</span>Sin ingredientes aún</div>
     {% endif %}
   </div>
 
 </div>
+
+<!-- ═══ MODAL: Confirmar Eliminación ═══ -->
+<div id="modal-eliminar" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-eliminar')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">🗑️</div>
+    <h3 class="modal-title">¿Eliminar ingrediente?</h3>
+    <p class="modal-desc" id="modal-eliminar-desc"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cerrarModal('modal-eliminar')">Cancelar</button>
+      <form id="modal-eliminar-form" method="POST">
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Ajustar Stock ═══ -->
+<div id="modal-ajuste" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-ajuste')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-icon">⚡</div>
+    <h3 class="modal-title">Ajustar Stock</h3>
+    <p class="modal-desc" id="ajuste-nombre-texto"></p>
+    <form id="form-ajuste" method="POST">
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Cantidad a sumar (+) o restar (−)</label>
+        <input type="number" name="cantidad" id="ajuste-cantidad" step="0.1" placeholder="Ej: 10 o -5" required/>
+      </div>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Stock actual: <strong id="ajuste-stock-actual"></strong></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-ajuste')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Aplicar ajuste</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Editar Ingrediente ═══ -->
+<div id="modal-editar" class="modal-overlay" style="display:none;" onclick="cerrarModal('modal-editar')">
+  <div class="modal-box modal-box-wide" onclick="event.stopPropagation()">
+    <div class="modal-icon">✏️</div>
+    <h3 class="modal-title">Editar Ingrediente</h3>
+    <form id="form-editar" method="POST">
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" name="nombre" id="editar-nombre" required/>
+      </div>
+      <div class="form-group">
+        <label>Stock actual</label>
+        <input type="number" name="stock_actual" id="editar-stock" step="0.1" min="0" required/>
+      </div>
+      <div class="form-group">
+        <label>Stock mínimo (alerta reorden)</label>
+        <input type="number" name="stock_minimo" id="editar-minimo" step="0.1" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Unidad de medida</label>
+        <select name="unidad" id="editar-unidad">
+          <option value="unidad">Unidad</option>
+          <option value="kg">Kilogramo (kg)</option>
+          <option value="g">Gramo (g)</option>
+          <option value="l">Litro (l)</option>
+          <option value="ml">Mililitro (ml)</option>
+          <option value="piezas">Piezas</option>
+          <option value="porciones">Porciones</option>
+          <option value="rebanadas">Rebanadas</option>
+          <option value="hojas">Hojas</option>
+          <option value="tiras">Tiras</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Proveedor</label>
+        <select name="proveedor_id" id="editar-proveedor">
+          <option value="">— Sin proveedor —</option>
+          {% for p in proveedores %}
+            <option value="{{ p.id }}">{{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-editar')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function confirmarEliminar(nombre, url) {
+    document.getElementById('modal-eliminar-desc').textContent = `"${nombre}" será eliminado permanentemente.`;
+    document.getElementById('modal-eliminar-form').action = url;
+    document.getElementById('modal-eliminar').style.display = 'flex';
+  }
+
+  function abrirAjuste(id, nombre, stockActual, unidad) {
+    document.getElementById('ajuste-nombre-texto').textContent = nombre;
+    document.getElementById('ajuste-stock-actual').textContent = stockActual + ' ' + unidad;
+    document.getElementById('ajuste-cantidad').value = '';
+    document.getElementById('form-ajuste').action = `/ingredientes/${id}/ajustar`;
+    document.getElementById('modal-ajuste').style.display = 'flex';
+  }
+
+  function abrirEditar(id, nombre, stock, minimo, unidad, provId) {
+    document.getElementById('editar-nombre').value = nombre;
+    document.getElementById('editar-stock').value = stock;
+    document.getElementById('editar-minimo').value = minimo;
+    document.getElementById('editar-unidad').value = unidad;
+    document.getElementById('editar-proveedor').value = provId;
+    document.getElementById('form-editar').action = `/ingredientes/${id}/editar`;
+    document.getElementById('modal-editar').style.display = 'flex';
+  }
+
+  function cerrarModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['modal-eliminar','modal-ajuste','modal-editar'].forEach(cerrarModal);
+    }
+  });
+
+  // Búsqueda en tiempo real
+  function filtrarIngredientes(query) {
+    const filas = document.querySelectorAll('.ing-fila');
+    const term = query.toLowerCase().trim();
+    let visibles = 0;
+    filas.forEach(fila => {
+      const nombre = fila.dataset.nombre || '';
+      const match = nombre.includes(term);
+      fila.style.display = match ? '' : 'none';
+      if (match) visibles++;
+    });
+    document.getElementById('contador').textContent = visibles;
+    document.getElementById('sin-resultados').style.display = visibles === 0 && term ? 'block' : 'none';
+  }
+</script>
 {% endblock %}
