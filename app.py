@@ -40,14 +40,8 @@ def index():
     hoy = str(date.today())
     producciones_hoy = Produccion.query.filter_by(fecha=hoy).count()
     stock_bajo = Ingrediente.query.filter(
-        Ingrediente.stock_actual <= Ingrediente.stock_minimo
-    ).filter(Ingrediente.stock_minimo > 0).all()
-    # Fallback: también incluir stock < 10 sin stock_minimo configurado
-    sin_minimo_bajo = Ingrediente.query.filter(
-        Ingrediente.stock_minimo == 0,
-        Ingrediente.stock_actual < 10
+        Ingrediente.estado.in_(["POR_AGOTARSE", "AGOTADO"])
     ).all()
-    stock_bajo = list({i.id: i for i in stock_bajo + sin_minimo_bajo}.values())
 
     # Chart: producción (unidades totales) por día últimos 14 días
     labels = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
@@ -126,8 +120,7 @@ def eliminar_proveedor(id):
 def ingredientes():
     if request.method == "POST":
         nombre  = request.form.get("nombre", "").strip()
-        stock   = request.form.get("stock_actual", 0, type=float)
-        minimo  = request.form.get("stock_minimo", 0, type=float)
+        estado  = request.form.get("estado", "SUFICIENTE").strip()
         unidad  = request.form.get("unidad", "unidad").strip()
         prov_id = request.form.get("proveedor_id") or None
         if not nombre:
@@ -137,7 +130,7 @@ def ingredientes():
             flash(f"Ya existe un ingrediente con el nombre '{nombre}'.", "danger")
             return redirect(url_for("ingredientes"))
         db.session.add(Ingrediente(
-            nombre=nombre, stock_actual=stock, stock_minimo=minimo,
+            nombre=nombre, estado=estado,
             unidad=unidad, proveedor_id=prov_id
         ))
         db.session.commit()
@@ -153,8 +146,7 @@ def ingredientes():
 def editar_ingrediente(id):
     ing = Ingrediente.query.get_or_404(id)
     nombre  = request.form.get("nombre", "").strip()
-    stock   = request.form.get("stock_actual", 0, type=float)
-    minimo  = request.form.get("stock_minimo", 0, type=float)
+    estado  = request.form.get("estado", "SUFICIENTE").strip()
     unidad  = request.form.get("unidad", "unidad").strip()
     prov_id = request.form.get("proveedor_id") or None
     if not nombre:
@@ -165,8 +157,7 @@ def editar_ingrediente(id):
         flash(f"Ya existe otro ingrediente con el nombre '{nombre}'.", "danger")
         return redirect(url_for("ingredientes"))
     ing.nombre = nombre
-    ing.stock_actual = stock
-    ing.stock_minimo = minimo
+    ing.estado = estado
     ing.unidad = unidad
     ing.proveedor_id = prov_id
     db.session.commit()
@@ -174,14 +165,14 @@ def editar_ingrediente(id):
     return redirect(url_for("ingredientes"))
 
 
-@app.route("/ingredientes/<int:id>/ajustar", methods=["POST"])
-def ajustar_stock(id):
+@app.route("/ingredientes/<int:id>/cambiar_estado", methods=["POST"])
+def cambiar_estado(id):
     ing = Ingrediente.query.get_or_404(id)
-    cantidad = request.form.get("cantidad", 0, type=float)
-    ing.stock_actual = max(0, ing.stock_actual + cantidad)
-    db.session.commit()
-    accion = "aumentado" if cantidad >= 0 else "reducido"
-    flash(f"Stock de '{ing.nombre}' {accion}. Nuevo stock: {ing.stock_actual} {ing.unidad}", "success")
+    nuevo_estado = request.form.get("estado", "SUFICIENTE").strip()
+    if nuevo_estado in ["SUFICIENTE", "POR_AGOTARSE", "AGOTADO"]:
+        ing.estado = nuevo_estado
+        db.session.commit()
+        flash(f"Estado de '{ing.nombre}' cambiado a {nuevo_estado}", "success")
     return redirect(url_for("ingredientes"))
 
 
@@ -290,18 +281,8 @@ def produccion():
                 db.session.add(Produccion(fecha=fecha, receta_id=int(rec_id), unidades=int(und)))
                 count += 1
 
-        # ── Descontar stock automáticamente ──
-        for rec_id, und in zip(rec_ids, unds):
-            if rec_id and und:
-                receta = Receta.query.get(int(rec_id))
-                if receta:
-                    for ri in receta.ingredientes:
-                        ri.ingrediente.stock_actual = max(
-                            0, ri.ingrediente.stock_actual - ri.cantidad * int(und)
-                        )
-
         db.session.commit()
-        flash(f"Producción registrada — {count} receta(s) para {fecha}. Stock descontado automáticamente. ✅", "success")
+        flash(f"Producción registrada — {count} receta(s) para {fecha}. ✅", "success")
         return redirect(url_for("produccion"))
 
     # Filtro por fecha o rango
@@ -367,8 +348,7 @@ def api_ingredientes():
             return jsonify({"error": f"Ingrediente '{nombre}' ya existe"}), 409
         ing = Ingrediente(
             nombre=nombre,
-            stock_actual=data.get("stock_actual", 0),
-            stock_minimo=data.get("stock_minimo", 0),
+            estado=data.get("estado", "SUFICIENTE"),
             unidad=data.get("unidad", "unidad"),
             proveedor_id=data.get("proveedor_id"),
         )
@@ -377,13 +357,13 @@ def api_ingredientes():
         return jsonify(ing.to_dict()), 201
     return jsonify([i.to_dict() for i in Ingrediente.query.all()])
 
-@app.route("/api/ingredientes/<int:id>/stock", methods=["POST"])
-def api_update_stock(id):
+@app.route("/api/ingredientes/<int:id>/estado", methods=["POST"])
+def api_update_estado(id):
     ing = Ingrediente.query.get_or_404(id)
     data = request.get_json(force=True)
-    nuevo_stock = data.get("stock_actual")
-    if nuevo_stock is not None:
-        ing.stock_actual = float(nuevo_stock)
+    nuevo_estado = data.get("estado")
+    if nuevo_estado in ["SUFICIENTE", "POR_AGOTARSE", "AGOTADO"]:
+        ing.estado = nuevo_estado
         db.session.commit()
     return jsonify(ing.to_dict())
 
@@ -500,15 +480,13 @@ def api_proyectar_orden():
         ing = Ingrediente.query.get(ing_id)
         if not ing:
             continue
-        diferencia = total_necesario - ing.stock_actual
-        if diferencia > 0:
+        if total_necesario > 0:
             proveedor_nombre = ing.proveedor.nombre if ing.proveedor else "Sin proveedor"
             faltante = {
                 "ingrediente_id": ing.id,
                 "ingrediente": ing.nombre,
-                "stock_actual": ing.stock_actual,
+                "estado": ing.estado,
                 "necesario": total_necesario,
-                "faltante": round(diferencia, 2),
                 "unidad": ing.unidad,
                 "proveedor": proveedor_nombre,
             }
@@ -516,7 +494,8 @@ def api_proyectar_orden():
             orden_por_proveedor[proveedor_nombre].append({
                 "ingrediente_id": ing.id,
                 "ingrediente": ing.nombre,
-                "cantidad_a_pedir": round(diferencia, 2),
+                "estado": ing.estado,
+                "necesario": total_necesario,
                 "unidad": ing.unidad,
             })
             

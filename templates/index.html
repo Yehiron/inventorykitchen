@@ -43,13 +43,13 @@
 <div class="alert-stock" style="margin-bottom:1.5rem;">
   <div class="alert-stock-header">
     <span>⚠️</span>
-    <strong>{{ stock_bajo|length }} ingrediente(s) con stock bajo (&lt; 10)</strong>
+    <strong>{{ stock_bajo|length }} ingrediente(s) marcados como Por agotarse o Agotado</strong>
     <a href="/ingredientes" style="margin-left:auto;font-size:.8rem;color:var(--accent);text-decoration:none;">Ver ingredientes →</a>
   </div>
   <div class="alert-stock-pills">
     {% for ing in stock_bajo %}
-      <span class="stock-pill {% if ing.stock_actual <= 3 %}pill-red{% else %}pill-yellow{% endif %}">
-        {{ ing.nombre }} — {{ ing.stock_actual }} {{ ing.unidad }}
+      <span class="stock-pill {% if ing.estado == 'AGOTADO' %}pill-red{% else %}pill-yellow{% endif %}">
+        {{ ing.nombre }} — {% if ing.estado == 'AGOTADO' %}🔴 Agotado{% else %}🟡 Por Agotarse{% endif %}
       </span>
     {% endfor %}
   </div>
@@ -66,22 +66,20 @@
         <thead>
           <tr>
             <th>Ingrediente</th>
-            <th>Stock</th>
-            <th>Estado</th>
+            <th>Estado Actual</th>
           </tr>
         </thead>
         <tbody>
           {% for ing in ingredientes %}
           <tr>
             <td>{{ ing.nombre }}</td>
-            <td>{{ ing.stock_actual }} {{ ing.unidad }}</td>
             <td>
-              {% if ing.stock_actual <= 3 %}
-                <span class="badge badge-red">⚠️ Crítico</span>
-              {% elif ing.stock_actual <= 10 %}
-                <span class="badge badge-yellow">Bajo</span>
+              {% if ing.estado == 'AGOTADO' %}
+                <span class="badge badge-red">🔴 Agotado</span>
+              {% elif ing.estado == 'POR_AGOTARSE' %}
+                <span class="badge badge-yellow">🟡 Por Agotarse</span>
               {% else %}
-                <span class="badge badge-green">OK</span>
+                <span class="badge badge-green">🟢 Suficiente</span>
               {% endif %}
             </td>
           </tr>

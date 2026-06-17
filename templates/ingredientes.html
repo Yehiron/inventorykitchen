@@ -22,12 +22,12 @@
         <input type="text" name="nombre" id="nuevo-nombre" placeholder="Ej: Carne molida 150g" required/>
       </div>
       <div class="form-group">
-        <label>Stock actual</label>
-        <input type="number" name="stock_actual" step="0.1" min="0" placeholder="0" required/>
-      </div>
-      <div class="form-group">
-        <label>Stock mínimo (alerta reorden)</label>
-        <input type="number" name="stock_minimo" step="0.1" min="0" placeholder="0"/>
+        <label>Estado actual (Semáforo)</label>
+        <select name="estado">
+          <option value="SUFICIENTE">🟢 Suficiente</option>
+          <option value="POR_AGOTARSE">🟡 Por agotarse</option>
+          <option value="AGOTADO">🔴 Agotado</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Unidad de medida</label>
@@ -63,18 +63,20 @@
     {% if ingredientes %}
       <table id="tabla-ingredientes">
         <thead>
-          <tr><th>Nombre</th><th>Stock</th><th>Proveedor</th><th style="text-align:right;">Acciones</th></tr>
+          <tr><th>Nombre</th><th>Estado</th><th>Proveedor</th><th style="text-align:right;">Acciones</th></tr>
         </thead>
         <tbody>
           {% for ing in ingredientes %}
           <tr class="ing-fila" data-nombre="{{ ing.nombre|lower }}">
             <td><strong>{{ ing.nombre }}</strong></td>
             <td>
-              {{ ing.stock_actual }} {{ ing.unidad }}
-              <div class="progress-bar">
-                {% set pct = [[(ing.stock_actual / 100 * 100)|int, 0]|max, 100]|min %}
-                <div class="progress-fill" style="width:{{ pct }}%;background:{% if pct <= 10 %}var(--red){% elif pct <= 30 %}var(--yellow){% else %}var(--green){% endif %};"></div>
-              </div>
+              {% if ing.estado == 'SUFICIENTE' %}
+                <span class="badge badge-green">🟢 Suficiente</span>
+              {% elif ing.estado == 'POR_AGOTARSE' %}
+                <span class="badge badge-yellow">🟡 Por Agotarse</span>
+              {% else %}
+                <span class="badge badge-red">🔴 Agotado</span>
+              {% endif %}
             </td>
             <td>
               {% if ing.proveedor %}
@@ -84,8 +86,8 @@
               {% endif %}
             </td>
             <td style="text-align:right;white-space:nowrap;">
-              <button class="btn btn-outline btn-sm" onclick="abrirAjuste({{ ing.id }}, '{{ ing.nombre }}', {{ ing.stock_actual }}, '{{ ing.unidad }}')" title="Ajustar stock">⚡</button>
-              <button class="btn btn-outline btn-sm" onclick="abrirEditar({{ ing.id }}, '{{ ing.nombre }}', {{ ing.stock_actual }}, {{ ing.stock_minimo }}, '{{ ing.unidad }}', '{{ ing.proveedor_id or '' }}')" title="Editar">✏️</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirAjuste({{ ing.id }}, '{{ ing.nombre }}', '{{ ing.estado }}')" title="Cambiar Estado">⚡</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirEditar({{ ing.id }}, '{{ ing.nombre }}', '{{ ing.estado }}', '{{ ing.unidad }}', '{{ ing.proveedor_id or '' }}')" title="Editar">✏️</button>
               <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmarEliminar('{{ ing.nombre }}', '/ingredientes/{{ ing.id }}/eliminar')" title="Eliminar">🗑️</button>
             </td>
           </tr>
@@ -123,10 +125,13 @@
     <p class="modal-desc" id="ajuste-nombre-texto"></p>
     <form id="form-ajuste" method="POST">
       <div class="form-group" style="margin-top:1rem;">
-        <label>Cantidad a sumar (+) o restar (−)</label>
-        <input type="number" name="cantidad" id="ajuste-cantidad" step="0.1" placeholder="Ej: 10 o -5" required/>
+        <label>Nuevo Estado</label>
+        <select name="estado" id="ajuste-estado">
+          <option value="SUFICIENTE">🟢 Suficiente</option>
+          <option value="POR_AGOTARSE">🟡 Por agotarse</option>
+          <option value="AGOTADO">🔴 Agotado</option>
+        </select>
       </div>
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Stock actual: <strong id="ajuste-stock-actual"></strong></p>
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" onclick="cerrarModal('modal-ajuste')">Cancelar</button>
         <button type="submit" class="btn btn-primary">Aplicar ajuste</button>
@@ -146,12 +151,12 @@
         <input type="text" name="nombre" id="editar-nombre" required/>
       </div>
       <div class="form-group">
-        <label>Stock actual</label>
-        <input type="number" name="stock_actual" id="editar-stock" step="0.1" min="0" required/>
-      </div>
-      <div class="form-group">
-        <label>Stock mínimo (alerta reorden)</label>
-        <input type="number" name="stock_minimo" id="editar-minimo" step="0.1" min="0"/>
+        <label>Estado</label>
+        <select name="estado" id="editar-estado">
+          <option value="SUFICIENTE">🟢 Suficiente</option>
+          <option value="POR_AGOTARSE">🟡 Por agotarse</option>
+          <option value="AGOTADO">🔴 Agotado</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Unidad de medida</label>
@@ -192,18 +197,16 @@
     document.getElementById('modal-eliminar').style.display = 'flex';
   }
 
-  function abrirAjuste(id, nombre, stockActual, unidad) {
+  function abrirAjuste(id, nombre, estado) {
     document.getElementById('ajuste-nombre-texto').textContent = nombre;
-    document.getElementById('ajuste-stock-actual').textContent = stockActual + ' ' + unidad;
-    document.getElementById('ajuste-cantidad').value = '';
-    document.getElementById('form-ajuste').action = `/ingredientes/${id}/ajustar`;
+    document.getElementById('ajuste-estado').value = estado;
+    document.getElementById('form-ajuste').action = `/ingredientes/${id}/cambiar_estado`;
     document.getElementById('modal-ajuste').style.display = 'flex';
   }
 
-  function abrirEditar(id, nombre, stock, minimo, unidad, provId) {
+  function abrirEditar(id, nombre, estado, unidad, provId) {
     document.getElementById('editar-nombre').value = nombre;
-    document.getElementById('editar-stock').value = stock;
-    document.getElementById('editar-minimo').value = minimo;
+    document.getElementById('editar-estado').value = estado;
     document.getElementById('editar-unidad').value = unidad;
     document.getElementById('editar-proveedor').value = provId;
     document.getElementById('form-editar').action = `/ingredientes/${id}/editar`;

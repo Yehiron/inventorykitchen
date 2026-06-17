@@ -19,6 +19,12 @@ def _migrate(app):
             db.session.commit()
         except Exception:
             db.session.rollback()  # columna ya existe, ignorar
+            
+        try:
+            db.session.execute(text("ALTER TABLE ingredientes ADD COLUMN estado VARCHAR(20) NOT NULL DEFAULT 'SUFICIENTE'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()  # columna ya existe, ignorar
 
 
 def _seed_data():
@@ -33,11 +39,11 @@ def _seed_data():
     db.session.flush()  # para obtener IDs
 
     #  Ingredientes 
-    i1 = Ingrediente(nombre="Pan de hamburguesa", stock_actual=50, unidad="piezas", proveedor_id=p1.id)
-    i2 = Ingrediente(nombre="Carne molida 150g", stock_actual=30, unidad="porciones", proveedor_id=p2.id)
-    i3 = Ingrediente(nombre="Queso cheddar", stock_actual=20, unidad="rebanadas", proveedor_id=p1.id)
-    i4 = Ingrediente(nombre="Lechuga", stock_actual=40, unidad="hojas", proveedor_id=p1.id)
-    i5 = Ingrediente(nombre="Tocino", stock_actual=15, unidad="tiras", proveedor_id=p2.id)
+    i1 = Ingrediente(nombre="Pan de hamburguesa", estado="SUFICIENTE", unidad="piezas", proveedor_id=p1.id)
+    i2 = Ingrediente(nombre="Carne molida 150g", estado="SUFICIENTE", unidad="porciones", proveedor_id=p2.id)
+    i3 = Ingrediente(nombre="Queso cheddar", estado="SUFICIENTE", unidad="rebanadas", proveedor_id=p1.id)
+    i4 = Ingrediente(nombre="Lechuga", estado="POR_AGOTARSE", unidad="hojas", proveedor_id=p1.id)
+    i5 = Ingrediente(nombre="Tocino", estado="AGOTADO", unidad="tiras", proveedor_id=p2.id)
     db.session.add_all([i1, i2, i3, i4, i5])
     db.session.flush()
 

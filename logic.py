@@ -38,14 +38,12 @@ def calcular_orden(producciones_ids: list[int]) -> dict:
         if not ing:
             continue
 
-        diferencia = total_necesario - ing.stock_actual
-        if diferencia > 0:
+        if total_necesario > 0:
             faltante = {
                 "ingrediente_id": ing.id,
                 "ingrediente": ing.nombre,
-                "stock_actual": ing.stock_actual,
+                "estado": ing.estado,
                 "necesario": total_necesario,
-                "faltante": diferencia,
                 "unidad": ing.unidad,
                 "proveedor": ing.proveedor.nombre if ing.proveedor else "Sin proveedor",
             }
@@ -54,7 +52,8 @@ def calcular_orden(producciones_ids: list[int]) -> dict:
             proveedor_nombre = ing.proveedor.nombre if ing.proveedor else "Sin proveedor"
             orden_por_proveedor[proveedor_nombre].append({
                 "ingrediente": ing.nombre,
-                "cantidad_a_pedir": round(diferencia, 2),
+                "estado": ing.estado,
+                "necesario": total_necesario,
                 "unidad": ing.unidad,
             })
 
